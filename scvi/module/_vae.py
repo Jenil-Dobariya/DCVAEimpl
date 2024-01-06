@@ -14,7 +14,7 @@ from scvi.autotune._types import Tunable
 from scvi.data._constants import ADATA_MINIFY_TYPE
 from scvi.distributions import NegativeBinomial, Poisson, ZeroInflatedNegativeBinomial
 from scvi.module.base import BaseMinifiedModeModuleClass, LossOutput, auto_move_data
-from scvi.nn import DecoderSCVI, Encoder, Encoder1, LinearDecoderSCVI, one_hot
+from scvi.nn import DecoderSCVI, Encoder, Encoder1, LinearDecoderSCVI, one_hot, Discriminator
 
 torch.backends.cudnn.benchmark = True
 
@@ -114,6 +114,7 @@ class VAE(BaseMinifiedModeModuleClass):
         n_z1: int = 10,
         n_delta: int = 10,
         n_layers: Tunable[int] = 1,
+        cont_dim: int=16,
         n_continuous_cov: int = 0,
         n_cats_per_cov: Optional[Iterable[int]] = None,
         dropout_rate: Tunable[float] = 0.1,
@@ -269,6 +270,15 @@ class VAE(BaseMinifiedModeModuleClass):
             use_layer_norm=use_layer_norm_decoder,
             scale_activation="softplus" if use_size_factor_key else "softmax",
             **_extra_decoder_kwargs,
+        )
+
+        self.discriminator = Discriminator(
+            n_input,
+            cont_dim,
+            None,
+            n_layers,
+            n_hidden,
+            dropout_rate
         )
 
     def _get_inference_input(
@@ -530,7 +540,44 @@ class VAE(BaseMinifiedModeModuleClass):
             ).sum(dim=1)
         else:
             kl_divergence_l = torch.tensor(0.0, device=x.device)
-        reconst_loss = -generative_outputs["px"].log_prob(x).sum(-1)
+
+
+        z = inference_outputs["z"]
+        rand_z = Normal(torch.zeros_like(z), torch.ones_like(z))
+        rand_z = rand_z.rsample()
+
+        fake_gen_outputs = self.generative(rand_z, inference_outputs["library"], tensors[REGISTRY_KEYS.BATCH_KEY])
+
+        fake_validity = self.discriminator(fake_gen_outputs["px"], "dis")
+        reconst_validity = self.discriminator(generative_outputs["px"], "dis")
+
+        gan_loss = -(torch.mean(fake_validity)*0.5 + torch.mean(reconst_validity)*0.5)
+
+        total_cont_loss = torch.tensor(0.0)
+
+        real_cont = self.discriminator(x, "cont")
+        reconst_cont = self.discriminator(generative_outputs["px"], "cont")
+
+        for l in ["l1", "l2"]:
+            key_real = real_cont[l]
+            query_rec = reconst_cont[l]
+
+            key_real = F.normalize(key_real, dim=1)
+            key_real = F.normalize(query_rec, dim=1)
+
+            keys_queue = torch.randn(self.cont_dim, 2000)
+            key_real = F.normalize(keys_queue, dim=0)
+
+            l_pos = torch.einsum("nc,nc->n", [key_real,query_rec]).unsqueeze(-1)
+            l_neg = torch.einsum("nc,ck->nk", [query_rec,keys_queue.detach()])
+            logits = torch.cat([l_pos, l_neg], dim=1) / 0.07
+            labels = torch.zeros(logits.shape[0])
+            cont_loss = torch.nn.CrossEntropyLoss()(logits, labels)
+            total_cont_loss += cont_loss
+
+        reconst_loss = gan_loss + total_cont_loss
+            
+        # reconst_loss = -generative_outputs["px"].log_prob(x).sum(-1)
 
         kl_local_no_warmup = kl_divergence_l
 

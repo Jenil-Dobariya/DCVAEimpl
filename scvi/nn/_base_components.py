@@ -100,6 +100,10 @@ class FCLayers(nn.Module):
                 ]
             )
         )
+        self.custom_layer = None
+
+    def set_cust_layer(self, cust_layer):
+        self.custom_layer = cust_layer
 
     def inject_into_layer(self, layer_num) -> bool:
         """Helper to determine if covariates should be injected."""
@@ -186,6 +190,8 @@ class FCLayers(nn.Module):
                                 one_hot_cat_list_layer = one_hot_cat_list
                             x = torch.cat((x, *one_hot_cat_list_layer), dim=-1)
                         x = layer(x)
+        if self.custom_layer is not None:
+            x = self.custom_layer(x)
         return x
 
 
@@ -292,6 +298,101 @@ class Encoder(nn.Module):
             return dist, latent
         return q_m, q_v, latent
 
+
+class Discriminator(nn.Module):
+    """Encode data of ``n_input`` dimensions into a latent space of ``n_output`` dimensions.
+
+    Uses a fully-connected neural network of ``n_hidden`` layers.
+
+    Parameters
+    ----------
+    n_input
+        The dimensionality of the input (data space)
+    n_cat_list
+        A list containing the number of categories
+        for each category of interest. Each category will be
+        included using a one-hot encoding
+    n_layers
+        The number of fully-connected hidden layers
+    n_hidden
+        The number of nodes per hidden layer
+    dropout_rate
+        Dropout rate to apply to each of the hidden layers
+    return_dist
+        Return directly the distribution of z instead of its parameters.
+    **kwargs
+        Keyword args for :class:`~scvi.nn.FCLayers`
+    """
+
+    def __init__(
+        self,
+        n_input: int,
+        cont_dim:int =16,
+        n_cat_list: Iterable[int] = None,
+        n_layers: int = 1,
+        n_hidden: int = 128,
+        dropout_rate: float = 0.1,
+        **kwargs,
+    ):
+        super().__init__()
+
+        self.discriminator = FCLayers(
+            n_in=n_input,
+            n_out=n_hidden,
+            n_cat_list=n_cat_list,
+            n_layers=n_layers,
+            n_hidden=n_hidden,
+            dropout_rate=dropout_rate,
+            **kwargs,
+        )
+        cust_layer = nn.utils.spectral_norm(nn.Linear(n_hidden, n_hidden))
+        self.discriminator.set_cust_layer = cust_layer
+        self.disc_head = nn.utils.spectral_norm(nn.Linear(n_hidden,1))
+
+        self.contrasiditive = FCLayers(
+            n_in=n_input,
+            n_out=n_hidden,
+            n_cat_list=n_cat_list,
+            n_layers=1,
+            n_hidden=n_hidden,
+            dropout_rate=dropout_rate,
+            **kwargs,
+        )
+        self.contrasiditive.set_cust_layer = cust_layer
+        self.cont_head = nn.Linear(n_hidden, cont_dim, bias=False)
+
+    def forward(self, x: torch.Tensor, mode = "dis",  *cat_list: int):
+        r"""The forward computation for a single sample.
+
+         #. Encodes the data into latent space using the encoder network
+         #. Generates a mean \\( q_m \\) and variance \\( q_v \\)
+         #. Samples a new value from an i.i.d. multivariate normal \\( \\sim Ne(q_m, \\mathbf{I}q_v) \\)
+
+        Parameters
+        ----------
+        x
+            tensor with shape (n_input,)
+        cat_list
+            list of category membership(s) for this sample
+
+        Returns
+        -------
+        3-tuple of :py:class:`torch.Tensor`
+            tensors of shape ``(n_latent,)`` for mean and var, and sample
+
+        """
+        # Parameters for latent distribution
+        q = self.discriminator(x, *cat_list)
+
+        if mode == "dis":
+            q = self.disc_head(q)
+        elif mode=="cont":
+            q = {
+                "l1" : q,
+                "l2" : self.contrasiditive(x, *cat_list)
+            }
+        
+        return q
 
 class Encoder1(nn.Module):
     """Encode data of ``n_input`` dimensions into a latent space of ``n_output`` dimensions.
