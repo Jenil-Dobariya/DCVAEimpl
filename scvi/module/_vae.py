@@ -564,10 +564,10 @@ class VAE(BaseMinifiedModeModuleClass):
             query_rec = reconst_cont[l]
 
             key_real = F.normalize(key_real, dim=1)
-            key_real = F.normalize(query_rec, dim=1)
+            query_rec = F.normalize(query_rec, dim=1)
 
             keys_queue = torch.randn(self.cont_dim, 2000)
-            key_real = F.normalize(keys_queue, dim=0)
+            keys_queue = F.normalize(keys_queue, dim=0)
 
             l_pos = torch.einsum("nc,nc->n", [key_real,query_rec]).unsqueeze(-1)
             l_neg = torch.einsum("nc,ck->nk", [query_rec,keys_queue.detach()])
