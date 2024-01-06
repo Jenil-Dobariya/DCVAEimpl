@@ -760,6 +760,8 @@ class DecoderSCVI(nn.Module):
         # dropout
         self.px_dropout_decoder = nn.Linear(n_hidden, n_output)
 
+        self.output_l = nn.Linear(n_hidden, n_output)
+
     def forward(
         self,
         dispersion: str,
@@ -802,6 +804,7 @@ class DecoderSCVI(nn.Module):
         # Clamp to high value: exp(12) ~ 160000 to avoid nans (computational stability)
         px_rate = torch.exp(library) * px_scale  # torch.clamp( , max=12)
         px_r = self.px_r_decoder(px) if dispersion == "gene-cell" else None
+        px = self.output_l(px)
         return px_scale, px_r, px_rate, px_dropout, px
 
 
