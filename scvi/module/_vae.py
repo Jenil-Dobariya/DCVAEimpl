@@ -468,7 +468,7 @@ class VAE(BaseMinifiedModeModuleClass):
         if not self.use_size_factor_key:
             size_factor = library
 
-        px_scale, px_r, px_rate, px_dropout = self.decoder(
+        px_scale, px_r, px_rate, px_dropout, px = self.decoder(
             self.dispersion,
             decoder_input,
             size_factor,
@@ -487,17 +487,17 @@ class VAE(BaseMinifiedModeModuleClass):
 
         px_r = torch.exp(px_r)
 
-        if self.gene_likelihood == "zinb":
-            px = ZeroInflatedNegativeBinomial(
-                mu=px_rate,
-                theta=px_r,
-                zi_logits=px_dropout,
-                scale=px_scale,
-            )
-        elif self.gene_likelihood == "nb":
-            px = NegativeBinomial(mu=px_rate, theta=px_r, scale=px_scale)
-        elif self.gene_likelihood == "poisson":
-            px = Poisson(px_rate, scale=px_scale)
+        # if self.gene_likelihood == "zinb":
+        #     px = ZeroInflatedNegativeBinomial(
+        #         mu=px_rate,
+        #         theta=px_r,
+        #         zi_logits=px_dropout,
+        #         scale=px_scale,
+        #     )
+        # elif self.gene_likelihood == "nb":
+        #     px = NegativeBinomial(mu=px_rate, theta=px_r, scale=px_scale)
+        # elif self.gene_likelihood == "poisson":
+        #     px = Poisson(px_rate, scale=px_scale)
 
         # Priors
         if self.use_observed_lib_size:
