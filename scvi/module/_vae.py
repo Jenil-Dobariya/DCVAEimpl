@@ -488,17 +488,17 @@ class VAE(BaseMinifiedModeModuleClass):
 
         px_r = torch.exp(px_r)
 
-        # if self.gene_likelihood == "zinb":
-        #     px = ZeroInflatedNegativeBinomial(
-        #         mu=px_rate,
-        #         theta=px_r,
-        #         zi_logits=px_dropout,
-        #         scale=px_scale,
-        #     )
-        # elif self.gene_likelihood == "nb":
-        #     px = NegativeBinomial(mu=px_rate, theta=px_r, scale=px_scale)
-        # elif self.gene_likelihood == "poisson":
-        #     px = Poisson(px_rate, scale=px_scale)
+        if self.gene_likelihood == "zinb":
+            pxx = ZeroInflatedNegativeBinomial(
+                mu=px_rate,
+                theta=px_r,
+                zi_logits=px_dropout,
+                scale=px_scale,
+            )
+        elif self.gene_likelihood == "nb":
+            pxx = NegativeBinomial(mu=px_rate, theta=px_r, scale=px_scale)
+        elif self.gene_likelihood == "poisson":
+            pxx = Poisson(px_rate, scale=px_scale)
 
         # Priors
         if self.use_observed_lib_size:
@@ -513,6 +513,7 @@ class VAE(BaseMinifiedModeModuleClass):
         return {
             "px": px,
             "pl": pl,
+            "pxx":pxx
             # "pz": pz,
         }
 
@@ -576,15 +577,15 @@ class VAE(BaseMinifiedModeModuleClass):
             cont_loss = torch.nn.CrossEntropyLoss()(logits, labels)
             total_cont_loss += cont_loss
 
-        reconst_loss = gan_loss + total_cont_loss
+        # reconst_loss = gan_loss + total_cont_loss
             
-        # reconst_loss = -generative_outputs["px"].log_prob(x).sum(-1)
+        reconst_loss = -generative_outputs["pxx"].log_prob(x).sum(-1)
 
         kl_local_no_warmup = kl_divergence_l
 
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
-        loss = torch.mean(reconst_loss + weighted_kl_local)
+        loss = torch.mean(gan_loss + total_cont_loss + weighted_kl_local)
 
         kl_local = {
             "kl_divergence_l": kl_divergence_l,
