@@ -572,7 +572,7 @@ class VAE(BaseMinifiedModeModuleClass):
             l_pos = torch.einsum("nc,nc->n", [key_real,query_rec]).unsqueeze(-1)
             l_neg = torch.einsum("nc,ck->nk", [query_rec,keys_queue.detach()])
             logits = torch.cat([l_pos, l_neg], dim=1) / 0.07
-            labels = torch.zeros(logits.shape[0]).cuda()
+            labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
             cont_loss = torch.nn.CrossEntropyLoss()(logits, labels)
             total_cont_loss += cont_loss
 
