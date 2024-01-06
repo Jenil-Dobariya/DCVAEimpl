@@ -153,6 +153,7 @@ class VAE(BaseMinifiedModeModuleClass):
         self.latent_distribution = latent_distribution
         self.encode_covariates = encode_covariates
         self.n_dims = n_dims
+        self.cont_dim = cont_dim
 
         self.use_size_factor_key = use_size_factor_key
         self.use_observed_lib_size = use_size_factor_key or use_observed_lib_size
