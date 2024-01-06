@@ -554,7 +554,7 @@ class VAE(BaseMinifiedModeModuleClass):
 
         gan_loss = -(torch.mean(fake_validity)*0.5 + torch.mean(reconst_validity)*0.5)
 
-        total_cont_loss = torch.tensor(0.0)
+        total_cont_loss = torch.tensor(0.0).cuda()
 
         real_cont = self.discriminator(x, "cont")
         reconst_cont = self.discriminator(generative_outputs["px"], "cont")
@@ -566,13 +566,13 @@ class VAE(BaseMinifiedModeModuleClass):
             key_real = F.normalize(key_real, dim=1)
             query_rec = F.normalize(query_rec, dim=1)
 
-            keys_queue = torch.randn(self.cont_dim, 2000)
+            keys_queue = torch.randn(self.cont_dim, 2000).cuda()
             keys_queue = F.normalize(keys_queue, dim=0)
 
             l_pos = torch.einsum("nc,nc->n", [key_real,query_rec]).unsqueeze(-1)
             l_neg = torch.einsum("nc,ck->nk", [query_rec,keys_queue.detach()])
             logits = torch.cat([l_pos, l_neg], dim=1) / 0.07
-            labels = torch.zeros(logits.shape[0])
+            labels = torch.zeros(logits.shape[0]).cuda()
             cont_loss = torch.nn.CrossEntropyLoss()(logits, labels)
             total_cont_loss += cont_loss
 
