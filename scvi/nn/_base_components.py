@@ -349,7 +349,7 @@ class Discriminator(nn.Module):
         self.discriminator.set_cust_layer = cust_layer
         self.disc_head = nn.utils.spectral_norm(nn.Linear(n_hidden,1))
 
-        self.contrasiditive = FCLayers(
+        self.contrastive = FCLayers(
             n_in=n_input,
             n_out=n_hidden,
             n_cat_list=n_cat_list,
@@ -358,8 +358,9 @@ class Discriminator(nn.Module):
             dropout_rate=dropout_rate,
             **kwargs,
         )
-        self.contrasiditive.set_cust_layer = cust_layer
-        self.cont_head = nn.Linear(n_hidden, cont_dim, bias=False)
+        self.contrastive.set_cust_layer = cust_layer
+        self.cont_head1 = nn.Linear(n_hidden, cont_dim, bias=False)
+        self.cont_head2 = nn.Linear(n_hidden, cont_dim, bias=False)
 
     def forward(self, x: torch.Tensor, mode = "dis",  *cat_list: int):
         r"""The forward computation for a single sample.
@@ -388,8 +389,8 @@ class Discriminator(nn.Module):
             q = self.disc_head(q)
         elif mode=="cont":
             q = {
-                "l1" : q,
-                "l2" : self.contrasiditive(x, *cat_list)
+                "l1" : self.cont_head1(q),
+                "l2" : self.cont_head2(self.contrastive(x, *cat_list))
             }
         
         return q
