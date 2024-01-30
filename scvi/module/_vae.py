@@ -394,7 +394,7 @@ class VAE(BaseMinifiedModeModuleClass):
             categorical_input = ()
 
         qz, pz, z_smp, z = self.z_encoder(encoder_input, batch_index, *categorical_input)
-        
+
         ql = None
         if not self.use_observed_lib_size:
             ql, library_encoded = self.l_encoder(
@@ -553,7 +553,7 @@ class VAE(BaseMinifiedModeModuleClass):
         fake_validity = self.discriminator(fake_gen_outputs["px"], "dis")
         reconst_validity = self.discriminator(generative_outputs["px"], "dis")
 
-        gan_loss = -(torch.mean(fake_validity)*0.5 + torch.mean(reconst_validity)*0.5)
+        gan_loss = -((fake_validity)*0.5 + (reconst_validity)*0.5)
 
         total_cont_loss = torch.tensor(0.0).cuda()
 
@@ -577,15 +577,15 @@ class VAE(BaseMinifiedModeModuleClass):
             cont_loss = torch.nn.CrossEntropyLoss()(logits, labels)
             total_cont_loss += cont_loss
 
-        # reconst_loss = gan_loss + total_cont_loss
-            
-        reconst_loss = -generative_outputs["pxx"].log_prob(x).sum(-1)
+        reconst_loss = gan_loss + total_cont_loss
+
+        # reconst_loss = -generative_outputs["pxx"].log_prob(x).sum(-1)
 
         kl_local_no_warmup = kl_divergence_l
 
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
-        loss = torch.mean(gan_loss + total_cont_loss + weighted_kl_local)
+        loss = torch.mean(reconst_loss + weighted_kl_local)
 
         kl_local = {
             "kl_divergence_l": kl_divergence_l,
