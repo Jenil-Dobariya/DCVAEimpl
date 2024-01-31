@@ -7,7 +7,7 @@ from torch.distributions import Normal
 from torch.nn import ModuleList
 
 from ._utils import one_hot
-import numpy as np 
+import numpy as np
 
 def _identity(x):
     return x
@@ -389,10 +389,10 @@ class Discriminator(nn.Module):
             q = self.disc_head(q)
         elif mode=="cont":
             q = {
-                "l1" : self.cont_head1(q),
+                "l1" : self.cont_head1(self.contrastive(x, *cat_list)),
                 "l2" : self.cont_head2(self.contrastive(x, *cat_list))
             }
-        
+
         return q
 
 class Encoder1(nn.Module):
@@ -497,7 +497,7 @@ class Encoder1(nn.Module):
                             dropout_rate=dropout_rate,
                             **kwargs,
                             ))
-        
+
         self.pz_nn.append(None)
         for i in range(1,n_levels):
             self.pz_nn.append(FCLayers(
@@ -524,7 +524,7 @@ class Encoder1(nn.Module):
         self.qz_var_enc = nn.ModuleList()
         self.pz_mean_enc = nn.ModuleList()
         self.pz_var_enc = nn.ModuleList()
-        
+
         for i in range(n_levels):
             self.qz_mean_enc.append(nn.Linear(n_hidden, self.n_dims[i]))
             self.pz_mean_enc.append(nn.Linear(n_hidden, self.n_dims[i]))
@@ -566,7 +566,7 @@ class Encoder1(nn.Module):
 
         self.z_transformation = _identity
         self.var_activation = torch.exp if var_activation is None else var_activation
-        
+
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.h = torch.cat([torch.zeros(self.n_dims[0],device = self.device), torch.ones(self.n_dims[0],device = self.device)]).view(1, -1)
 
@@ -614,7 +614,7 @@ class Encoder1(nn.Module):
         distpz = [None for i in range(self.n_levels)]
         pz_m = [None for i in range(self.n_levels)]
         pz_v = [None for i in range(self.n_levels)]
-        
+
 
         qz[0] = self.qz_nn[0](x, *cat_list)
         qz_m[0] = self.qz_mean_enc[0](qz[0])
@@ -644,7 +644,7 @@ class Encoder1(nn.Module):
 
         pca_x = x.clone()
         for i in range(1,self.n_levels):
-            
+
             pz_z = torch.cat([pz[i-1],z_smp[i-1]],axis=1)
             pz[i] = self.pz_nn[i](pz_z)
             pz_m[i] = self.pz_mean_enc[i](pz[i])
@@ -671,8 +671,8 @@ class Encoder1(nn.Module):
         if self.type_ == "LVAE":
             z_final = self.fusion_nn(z_smp[-1])
         elif self.type_ == "NVAE" or self.type_ == "NVAE_PCA":
-            z_final = self.fusion_nn(z_cat) 
-        
+            z_final = self.fusion_nn(z_cat)
+
         # print(pz[1])
         #print("--------------")
         if self.return_dist:
@@ -681,7 +681,7 @@ class Encoder1(nn.Module):
             return distqz, distpz, z_smp.copy(), z_final
         # return qz1_m, qz1_v, qz2_m, qz2_v, pz1_m, pz1_v, pz2_m, pz2_v, z1, z2, z
         return qz_m, qz_v, z_smp.copy(), z_final
-        
+
 
 
 # Decoder
