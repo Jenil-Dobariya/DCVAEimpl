@@ -389,8 +389,8 @@ class Discriminator(nn.Module):
             q = self.disc_head(q)
         elif mode=="cont":
             q = {
-                "l1" : self.cont_head1(self.contrastive(x, *cat_list)),
-                "l2" : self.cont_head2(self.contrastive(x, *cat_list))
+                "l1" : self.cont_head1(q),
+                "l2" : self.cont_head2(q)
             }
 
         return q

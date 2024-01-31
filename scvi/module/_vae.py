@@ -550,15 +550,15 @@ class VAE(BaseMinifiedModeModuleClass):
 
         fake_gen_outputs = self.generative(rand_z, inference_outputs["library"], tensors[REGISTRY_KEYS.BATCH_KEY])
 
-        fake_validity = self.discriminator(fake_gen_outputs["px"], "dis")
-        reconst_validity = self.discriminator(generative_outputs["px"], "dis")
+        fake_validity = self.discriminator(fake_gen_outputs["pxx"], "dis")
+        reconst_validity = self.discriminator(generative_outputs["pxx"], "dis")
 
         gan_loss = -((fake_validity)*0.5 + (reconst_validity)*0.5)
 
         total_cont_loss = torch.tensor(0.0).cuda()
 
         real_cont = self.discriminator(x, "cont")
-        reconst_cont = self.discriminator(generative_outputs["px"], "cont")
+        reconst_cont = self.discriminator(generative_outputs["pxx"], "cont")
 
         for l in ["l1", "l2"]:
             key_real = real_cont[l]
